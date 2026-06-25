@@ -56,7 +56,7 @@
   #eyeWrap:hover #eye { opacity:.9; }
   #eyeWrap.dragging #eye { opacity:.95; }
   #eyeHint { display:block; margin:9px auto 0; opacity:.5; transition:opacity .25s; }
-  #eyeWrap.dragging #eyeHint, body.exhibit #eyeHint { opacity:0; }
+  #eyeWrap.dragging #eyeHint { opacity:0; }
   #empty { position:fixed; inset:0; display:none; align-items:center; justify-content:center;
     z-index:4; pointer-events:none; text-align:center; }
   #empty div { color:#9a8f7e; font-size:16px; line-height:1.6; }
@@ -582,9 +582,9 @@
   document.getElementById('toggle').onclick=()=>document.body.classList.remove('collapsed');
   document.getElementById('hideBtn').onclick=()=>document.body.classList.add('collapsed');
   document.querySelector('#panel h1').onclick=()=>document.body.classList.toggle('collapsed');
-  window.addEventListener('keydown',e=>{ if((e.key==='h'||e.key==='H')&&!e.metaKey&&!e.ctrlKey) document.body.classList.toggle('collapsed'); });
+  /* keyboard reveal disabled in the published build */
   document.body.classList.add('collapsed');   // tech sliders hidden by default — the eye is the main control; ≡ or H reveals
-  if(location.hash.toLowerCase().indexOf('art')>=0) document.body.classList.add('exhibit');  // exhibit mode
+  document.body.classList.add('exhibit');  // PUBLISHED build: control panel permanently hidden for every visitor
 
   // ---- video recording: hides the panel while recording, then restores it ----
   let mediaRec=null, recChunks=[], recording=false, recStart=0, recTimer=null;
