@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>-世-界-在-你-眼-前- · -The-World-Before-Your-Eye-</title>
+<style>
+  :root { --paper:#ffffff; --ink:#0f0d0c; }
+  html,body { margin:0; height:100%; overflow:hidden; background:var(--paper); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; color:#3a332c;
+    touch-action:none; overscroll-behavior:none; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
+  #stage { position:fixed; inset:0; }
+  canvas { display:block; }
+  #drop-hint { position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    pointer-events:none; opacity:0; transition:opacity .15s; z-index:5; background:rgba(255,255,255,.75); }
+  #drop-hint.show { opacity:1; }
+  #drop-hint span { border:2px dashed #b9b1a3; padding:28px 40px; border-radius:14px; font-size:18px; color:#6b6052; background:rgba(255,255,255,.7); }
+  #panel { position:fixed; top:14px; left:14px; z-index:10; background:rgba(255,255,255,.82);
+    backdrop-filter:blur(8px); border:1px solid rgba(0,0,0,.08); border-radius:12px;
+    padding:12px 14px; width:244px; box-shadow:0 6px 24px rgba(0,0,0,.10); font-size:12px; user-select:none; }
+  #panel h1 { font-size:13px; margin:0 0 2px; letter-spacing:.02em; cursor:pointer; }
+  #panel .sub { color:#8a7f70; margin:0 0 10px; font-size:11px; line-height:1.4; }
+  .row { display:flex; align-items:center; justify-content:space-between; margin:7px 0; gap:8px; }
+  .row label { color:#5b5247; }
+  .row input[type=range] { width:120px; }
+  .row .val { width:26px; text-align:right; color:#998c7b; font-variant-numeric:tabular-nums; }
+  .grp { margin:11px 0 3px; font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:#b3a795; border-top:1px solid rgba(0,0,0,.06); padding-top:8px; }
+  .grp:first-of-type { border-top:none; padding-top:2px; }
+  #loadBtn { margin-top:10px; width:100%; padding:8px; border:none; border-radius:8px;
+    background:var(--ink); color:#fff; font-size:12px; cursor:pointer; letter-spacing:.02em; }
+  #loadBtn:hover { background:#000; }
+  #recBtn { margin-top:6px; width:100%; padding:8px; border:none; border-radius:8px;
+    background:#6b6052; color:#fff; font-size:12px; cursor:pointer; letter-spacing:.02em; }
+  #recBtn:hover { background:#534a3f; }
+  #recBtn.rec { background:#c0392b; }
+  #recBtn.rec:hover { background:#a93226; }
+  #meta { margin-top:8px; color:#a99c8a; font-size:10.5px; line-height:1.4; }
+  #toggle { position:fixed; top:14px; left:14px; z-index:11; display:none; width:30px; height:30px;
+    border-radius:8px; border:none; background:rgba(255,255,255,.85); cursor:pointer; font-size:15px; }
+  #hideBtn { position:absolute; top:9px; right:10px; border:none; background:transparent; color:#b3a795;
+    cursor:pointer; font-size:15px; line-height:1; padding:2px 4px; }
+  #hideBtn:hover { color:#6b6052; }
+  .collapsed #panel { display:none; }
+  .collapsed #toggle { display:block; }
+  #recStop { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); z-index:20; display:none;
+    padding:10px 18px; border:none; border-radius:22px; background:#c0392b; color:#fff; font-size:13px;
+    cursor:pointer; box-shadow:0 4px 16px rgba(0,0,0,.25); letter-spacing:.02em; }
+  #recStop:hover { background:#a93226; }
+  body.recording #panel { display:none; }
+  body.recording #toggle { display:none; }
+  body.recording #recStop { display:block; }
+  /* exhibit mode (URL ends with #art): pure artwork, no controls at all */
+  body.exhibit #panel, body.exhibit #toggle, body.exhibit #recStop, body.exhibit #hideBtn { display:none !important; }
+  /* centered eye = zoom control (drag left/right) */
+  #eyeWrap { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); z-index:8; text-align:center; touch-action:none; }
+  #eye { cursor:ew-resize; opacity:.5; transition:opacity .25s; display:block; margin:0 auto; }
+  #eyeWrap:hover #eye { opacity:.9; }
+  #eyeWrap.dragging #eye { opacity:.95; }
+  #eyeHint { display:block; margin:9px auto 0; opacity:.5; transition:opacity .25s; }
+  #eyeWrap.dragging #eyeHint, body.exhibit #eyeHint { opacity:0; }
+  #empty { position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+    z-index:4; pointer-events:none; text-align:center; }
+  #empty div { color:#9a8f7e; font-size:16px; line-height:1.6; }
+  #empty b { color:#6b6052; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="drop-hint"><span>Drop your artwork (.psd / .png) here</span></div>
+<div id="empty"><div><b>Drag your .psd / .png here</b><br>or click “Load artwork…”.<br>It will be remembered next time.</div></div>
+<button id="toggle" title="Show controls">≡</button>
+<button id="recStop">■ Stop</button>
+<div id="eyeWrap">
+  <svg id="eye" viewBox="0 0 120 70" width="120" height="70">
+    <path d="M6 35 Q60 3 114 35 Q60 67 6 35 Z" fill="rgba(255,255,255,0.5)" stroke="#1b1714" stroke-width="2.4"/>
+    <g id="iris">
+      <circle cx="60" cy="35" r="15" fill="rgba(20,17,16,0.16)" stroke="#1b1714" stroke-width="1.8"/>
+      <circle cx="60" cy="35" r="6.5" fill="#0f0d0c"/>
+    </g>
+  </svg>
+  <svg id="eyeHint" viewBox="0 0 76 12" width="76" height="12" aria-hidden="true">
+    <path d="M2 6 L74 6 M2 6 L12 1.5 M2 6 L12 10.5 M74 6 L64 1.5 M74 6 L64 10.5"
+          fill="none" stroke="#1b1714" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+</div>
+<div id="panel">
+  <button id="hideBtn" title="Hide panel (H)">✕</button>
+  <h1>Living Portrait</h1>
+  <p class="sub">Your drawing, alive. The figure and the side line-bands move independently. Cursor disturbs it · scroll to zoom · drag to pan.</p>
+
+  <div class="grp">Figure · 中间人形</div>
+  <div class="row"><label>Flow</label><input id="s_figflow" type="range" min="0" max="100" value="50"><span class="val" id="v_figflow"></span></div>
+  <div class="row"><label>Breath</label><input id="s_figbreath" type="range" min="0" max="100" value="50"><span class="val" id="v_figbreath"></span></div>
+  <div class="row"><label>Speed</label><input id="s_figspeed" type="range" min="0" max="100" value="50"><span class="val" id="v_figspeed"></span></div>
+
+  <div class="grp">Bands · 左右横线</div>
+  <div class="row"><label>Sway</label><input id="s_bandsway" type="range" min="0" max="100" value="81"><span class="val" id="v_bandsway"></span></div>
+  <div class="row"><label>Speed</label><input id="s_bandspeed" type="range" min="0" max="100" value="86"><span class="val" id="v_bandspeed"></span></div>
+
+  <div class="grp">Global · 全局</div>
+  <div class="row"><label>Touch</label><input id="s_touch" type="range" min="0" max="100" value="50"><span class="val" id="v_touch"></span></div>
+  <div class="row"><label>Crisp</label><input id="s_crisp" type="range" min="0" max="100" value="50"><span class="val" id="v_crisp"></span></div>
+  <button id="loadBtn">Load artwork…</button>
+  <button id="recBtn">● Record video</button>
+  <input id="file" type="file" accept="image/*,.psd,.psb" style="display:none">
+  <div id="meta">placeholder portrait</div>
+</div>
+
+<!-- your artwork, baked in (downscaled to 4096px). delete this line to start empty. -->
+<script src="artwork_data.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ============================================================================
+   LIVING PORTRAIT — full-res crisp-ink flow-warp (v4)
+   Technique: the original drawing is uploaded to the GPU as a full-resolution
+   texture (every line kept 1:1) and shown through a single fragment shader.
+   Each frame the shader:
+     • domain-warps the sampling coordinate with an animated CURL-NOISE flow
+       field, biased ALONG each stroke's tangent (from the image gradient),
+       so the ink flows like it's alive but never leaves the drawing;
+     • re-levels + unsharp-masks the ink so fine lines stay crisp at any zoom;
+     • grows procedural tangent-flow lines outward into the empty margins to
+       "extend" the wings.
+   Dense linework is antialiased with mipmap + anisotropic filtering + 2x
+   supersampling. No pixels become dots — the picture stays the picture.
+============================================================================ */
+(() => {
+  const stage = document.getElementById('stage');
+  const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:false, preserveDrawingBuffer:true, powerPreference:'high-performance' });
+  const COARSE = !!(window.matchMedia && matchMedia('(pointer:coarse)').matches);
+  const DPR = Math.min(window.devicePixelRatio||1, COARSE?1.5:2);   // lighter on phones/tablets
+  renderer.setPixelRatio(DPR);
+  renderer.setClearColor(0xffffff, 1);
+  renderer.autoClear = false;                 // we clear once, then draw bg + image
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  stage.appendChild(renderer.domElement);
+  const MAXANISO = renderer.capabilities.getMaxAnisotropy ? renderer.capabilities.getMaxAnisotropy() : 1;
+
+  const PAPER = new THREE.Color(0xffffff);
+  const INK   = new THREE.Color(0x0f0d0c);
+  const P = { figFlow:0.30, figBreath:0.26, figSpeed:0.30, bandSway:0.45, bandSpeed:0.30, touch:0.50, crisp:0.46 };
+
+  let imgAspect = 1, tex = null, mesh = null, mat = null, maskTex = null;
+  // smooth view transform
+  let zoom=1, panX=0, panY=0, zoomT=1, panXT=0, panYT=0;
+  let intensity=1, intensityT=1;          // eye drag: 0 = still, 1 = normal, up to ~2.8 = fierce
+  let baseHW=1, baseHH=1, viewW=1, viewH=1;
+  const scene = new THREE.Scene();
+  const camera = new THREE.OrthographicCamera(-1,1,1,-1,-10,10);
+
+  const mouse = new THREE.Vector2(-10,-10);
+  const mousePrev = new THREE.Vector2(-10,-10);
+  const mouseVel = new THREE.Vector2(0,0);
+  let mouseInside=false, dragging=false, dragLast=null;
+
+  const VERT = `varying vec2 vUv;
+    void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`;
+
+  const FRAG = `
+    precision highp float;
+    varying vec2 vUv;
+    uniform sampler2D uTex;
+    uniform sampler2D uMask;     // R = horizontal-line-cluster weight (1) vs figure (0)
+    uniform vec2  uTexel;
+    uniform float uTime, uAspect, uZoom;
+    uniform float uFigFlow, uFigBreath, uFigSpeed, uBandSway, uBandSpeed, uTouch, uCrisp, uIntensity;
+    uniform vec2  uMouse, uMouseVel; uniform float uMouseAmt;
+    uniform vec3  uPaper, uInk;
+
+    vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}
+    vec2 mod289(vec2 x){return x-floor(x*(1.0/289.0))*289.0;}
+    vec3 permute(vec3 x){return mod289(((x*34.0)+1.0)*x);}
+    float snoise(vec2 v){
+      const vec4 C=vec4(0.211324865,0.366025403,-0.577350269,0.024390243);
+      vec2 i=floor(v+dot(v,C.yy)); vec2 x0=v-i+dot(i,C.xx);
+      vec2 i1=(x0.x>x0.y)?vec2(1.0,0.0):vec2(0.0,1.0);
+      vec4 x12=x0.xyxy+C.xxzz; x12.xy-=i1; i=mod289(i);
+      vec3 p=permute(permute(i.y+vec3(0.0,i1.y,1.0))+i.x+vec3(0.0,i1.x,1.0));
+      vec3 m=max(0.5-vec3(dot(x0,x0),dot(x12.xy,x12.xy),dot(x12.zw,x12.zw)),0.0); m=m*m; m=m*m;
+      vec3 x=2.0*fract(p*C.www)-1.0; vec3 h=abs(x)-0.5; vec3 ox=floor(x+0.5); vec3 a0=x-ox;
+      m*=1.79284291-0.85373472*(a0*a0+h*h);
+      vec3 g; g.x=a0.x*x0.x+h.x*x0.y; g.yz=a0.yz*x12.xz+h.yz*x12.yw;
+      return 130.0*dot(m,g);
+    }
+    vec2 curl(vec2 p){
+      float e=0.1;
+      float a=snoise(p+vec2(0.0,e)), b=snoise(p-vec2(0.0,e));
+      float c=snoise(p+vec2(e,0.0)), d=snoise(p-vec2(e,0.0));
+      return vec2(a-b, -(c-d))/(2.0*e);
+    }
+    float lum(vec2 uv){ vec4 t=texture2D(uTex, clamp(uv,0.0,1.0));
+      return mix(1.0, dot(t.rgb, vec3(0.299,0.587,0.114)), t.a); }
+
+    // procedural flowing pen-lines that extend the wings into empty space
+    float extendLines(vec2 uv, float t){
+      vec2 asp=vec2(uAspect,1.0); vec2 p=uv*asp;
+      vec2 w = curl(p*2.0 + vec2(0.0,t*0.4))*0.13 + curl(p*4.3 + vec2(t*0.25,0.0))*0.06;
+      float y = p.y + w.y + (uv.x-0.5)*0.15;          // warped horizontal striae
+      float dens = 70.0;
+      float band = abs(fract(y*dens) - 0.5);
+      float line = smoothstep(0.5,0.5-2.5/dens, band);   // thin lines
+      // taper line strength with the local flow so it reads as strokes, not stripes
+      line *= 0.6 + 0.4*snoise(p*vec2(1.0,3.0)+vec2(0.0,t*0.2));
+      return clamp(line,0.0,1.0);
+    }
+
+    void main(){
+      vec2 asp=vec2(uAspect,1.0);
+      vec2 p = vUv*asp;
+      float tf = uTime*(0.1 + uFigSpeed*0.5);     // figure time
+      float tb = uTime*(0.1 + uBandSpeed*0.5);    // band time
+      float amp = 1.0/max(uZoom,1.0);
+
+      float lx = lum(vUv+vec2(uTexel.x,0.0)) - lum(vUv-vec2(uTexel.x,0.0));
+      float ly = lum(vUv+vec2(0.0,uTexel.y)) - lum(vUv-vec2(0.0,uTexel.y));
+      vec2 grad=vec2(lx,ly);
+      float gm=clamp(length(grad)*6.0,0.0,1.0);
+      vec2 tang=(length(grad)>1e-4)?normalize(vec2(-grad.y,grad.x)):vec2(0.0);
+
+      // figure: flowing, tangent-following ink + breath
+      vec2 q=p*4.0;
+      vec2 cf=curl(q+vec2(0.0,tf)) + 0.5*curl(q*2.3+vec2(tf*1.2,0.0));
+      vec2 flow=mix(cf, tang*dot(cf,tang), 0.7*gm);
+      float breath=sin(tf*0.8 + (p.x+p.y)*3.0 + snoise(p*1.3)*2.0);
+      // region weights: r = band, g = face, b = chest/belly
+      vec3 region = texture2D(uMask, vUv).rgb;
+      float hmask=region.r, faceW=region.g, torsoW=region.b;
+      float vTop = 1.0 - vUv.y;                       // 0 = top of image
+
+      // face: almost frozen
+      float figFlowAmt   = uFigFlow  * (1.0 - 0.99*faceW);
+      float figBreathAmt = uFigBreath * (1.0 + 2.0*torsoW) * (1.0 - 0.97*faceW);
+      vec2 dispFig=(flow*(figFlowAmt*0.006) + tang*breath*(figBreathAmt*0.0035)*gm)*amp;
+
+      // hair (top, dark, not face): airy floating strands
+      float ink0 = 1.0 - lum(vUv);
+      float hairW = smoothstep(0.26,0.04, vTop) * smoothstep(0.25,0.60, ink0) * (1.0 - faceW);
+      vec2 hairFlow = tang*sin(tf*1.0 + p.x*7.0 + p.y*5.0)*0.6 + curl(p*4.0+tf*0.5)*0.5;
+      dispFig += hairFlow * (0.003 + uFigFlow*0.005) * amp * hairW;
+
+      // chest/belly "flesh": soft swelling — gentler on the chest, fuller on the belly
+      vec2 torsoC=vec2(0.49,0.52)*asp;
+      vec2 rdir=normalize(p-torsoC+1e-4);
+      float pulse=0.6*sin(tf*1.4)+0.4*sin(tf*0.85+1.0);
+      float bellyBias = mix(0.40, 1.45, smoothstep(0.30,0.62, vTop));   // chest down, belly up
+      vec2 dispFlesh=(rdir*pulse + curl(p*2.2+tf*0.3)*0.40)*(0.005+uFigBreath*0.011)*amp*torsoW*bellyBias;
+      dispFig += dispFlesh;
+
+      // horizontal bands: big slow swelling waves (the version you liked) + tear fixes
+      float swell = sin(tb*0.5 + p.x*0.9)*0.95 + 0.45*snoise(vec2(p.x*0.6, tb*0.13));
+      // band scaled by intensity, then soft-capped: even at the extreme it never slides off / folds
+      float d = swell * (0.02 + uBandSway*0.85) * uIntensity;
+      d = 0.42 * d / (0.42 + abs(d));
+      vec2 dispBand = vec2(0.0, d) * amp;
+      float hm = hmask*hmask;                        // ease band to zero toward the figure (no tear)
+      // figure ambient scales freely with intensity (body writhes harder); 0 = frozen
+      vec2 disp = mix(dispFig*uIntensity, dispBand*hm, hm);
+
+      vec2 dd=p-uMouse*asp;
+      float infl=exp(-dot(dd,dd)*80.0*uZoom*uZoom)*uMouseAmt;
+      infl *= (1.0 - 0.6*faceW);                                  // face resists the cursor too
+      vec2 swirl=vec2(-dd.y,dd.x);
+      disp += (uMouseVel*asp*7.0 + swirl*2.0 + curl(p*9.0+tf)*0.15)*infl*(uTouch*0.06)*amp;
+
+      vec2 uv2=vUv+vec2(disp.x/uAspect, disp.y);
+
+      // unsharp mask -> silky but clear lines at any zoom
+      float l=lum(uv2);
+      vec2 e=uTexel*1.6;
+      float lb=(lum(uv2+vec2(e.x,0.0))+lum(uv2-vec2(e.x,0.0))+lum(uv2+vec2(0.0,e.y))+lum(uv2-vec2(0.0,e.y)))*0.25;
+      l=clamp(l + (l-lb)*(0.5+uCrisp*1.3), 0.0, 1.0);
+
+      // re-level: clear light haze, keep faint lines
+      float ink=1.0-l;
+      float haze=uCrisp*0.13;
+      ink=clamp((ink-haze)/(1.0-haze),0.0,1.0);
+      ink=pow(ink, mix(1.0,0.8,uCrisp));
+
+      // clean faint haze to pure white, keep the real lines (incl. faint wings)
+      ink *= smoothstep(0.015, 0.06, ink);
+      gl_FragColor=vec4(mix(uPaper,uInk,ink),1.0);
+    }`;
+
+  /* ---- background pass: generate flowing lines in the screen margins,
+          continuing from where the artwork is cut off, out to the edges ---- */
+  const BG_VERT = `varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position,1.0); }`;
+  const BG_FRAG = `
+    precision highp float;
+    varying vec2 vUv;
+    uniform float uTime,uSpeed,uExtend,uScreenAspect,uImgHalf; uniform vec3 uInk;
+    vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}
+    vec2 mod289(vec2 x){return x-floor(x*(1.0/289.0))*289.0;}
+    vec3 permute(vec3 x){return mod289(((x*34.0)+1.0)*x);}
+    float snoise(vec2 v){
+      const vec4 C=vec4(0.211324865,0.366025403,-0.577350269,0.024390243);
+      vec2 i=floor(v+dot(v,C.yy)); vec2 x0=v-i+dot(i,C.xx);
+      vec2 i1=(x0.x>x0.y)?vec2(1.0,0.0):vec2(0.0,1.0);
+      vec4 x12=x0.xyxy+C.xxzz; x12.xy-=i1; i=mod289(i);
+      vec3 p=permute(permute(i.y+vec3(0.0,i1.y,1.0))+i.x+vec3(0.0,i1.x,1.0));
+      vec3 m=max(0.5-vec3(dot(x0,x0),dot(x12.xy,x12.xy),dot(x12.zw,x12.zw)),0.0); m=m*m; m=m*m;
+      vec3 x=2.0*fract(p*C.www)-1.0; vec3 h=abs(x)-0.5; vec3 ox=floor(x+0.5); vec3 a0=x-ox;
+      m*=1.79284291-0.85373472*(a0*a0+h*h);
+      vec3 g; g.x=a0.x*x0.x+h.x*x0.y; g.yz=a0.yz*x12.xz+h.yz*x12.yw;
+      return 130.0*dot(m,g);
+    }
+    vec2 curl(vec2 p){ float e=0.1;
+      float a=snoise(p+vec2(0.0,e)),b=snoise(p-vec2(0.0,e)),c=snoise(p+vec2(e,0.0)),d=snoise(p-vec2(e,0.0));
+      return vec2(a-b,-(c-d))/(2.0*e); }
+    void main(){
+      vec2 p=vec2((vUv.x-0.5)*uScreenAspect, vUv.y-0.5);
+      float t=uTime*(0.1+uSpeed*0.5);
+      // gentle multi-octave flow warp -> flowing strands (not marble)
+      vec2 w = curl(p*1.3+vec2(0.0,t*0.33))*0.17
+             + curl(p*2.8+vec2(t*0.20,0.0))*0.085;
+      float y=p.y + w.y;
+      float dens=58.0;
+      float band=abs(fract(y*dens)-0.5);
+      float line=smoothstep(0.5, 0.5-2.0/dens, band);
+      float dx=abs(vUv.x-0.5);
+      // start right at the cut edge, ramp in softly (no hard block)
+      float m=smoothstep(uImgHalf*0.74, uImgHalf*0.99, dx);
+      // break the striae into separate flowing strands (some present, some absent)
+      float clump=smoothstep(-0.15,0.65, snoise(vec2(y*2.6, p.x*0.5 + t*0.05)));
+      // reach the far edge but thin slightly with distance
+      float edge=mix(1.0, 0.55, smoothstep(uImgHalf, 0.5, dx));
+      float ink=clamp(line,0.0,1.0)*m*clump*edge*uExtend*0.62;
+      gl_FragColor=vec4(mix(vec3(1.0),uInk,ink),1.0);
+    }`;
+  const bgScene=new THREE.Scene();
+  const bgCam=new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+  const bgMat=new THREE.ShaderMaterial({ vertexShader:BG_VERT, fragmentShader:BG_FRAG, uniforms:{
+    uTime:{value:0}, uSpeed:{value:P.bandSpeed}, uExtend:{value:0.0},
+    uScreenAspect:{value:1}, uImgHalf:{value:0.3}, uInk:{value:new THREE.Vector3(INK.r,INK.g,INK.b)}
+  }});
+  bgScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2), bgMat));
+
+  function setMeta(s){ document.getElementById('meta').textContent=s; }
+
+  function ingest(canvas,label){
+    const w=canvas.width,h=canvas.height; imgAspect=w/h;
+    if(tex) tex.dispose();
+    tex=new THREE.CanvasTexture(canvas);
+    const canMip=renderer.capabilities.isWebGL2;
+    tex.minFilter=canMip?THREE.LinearMipmapLinearFilter:THREE.LinearFilter;
+    tex.magFilter=THREE.LinearFilter; tex.generateMipmaps=canMip; tex.anisotropy=MAXANISO;
+    tex.wrapS=tex.wrapT=THREE.ClampToEdgeWrapping; tex.needsUpdate=true;
+    if(maskTex) maskTex.dispose();
+    maskTex=buildRegionMask(canvas);
+
+    if(mesh){ scene.remove(mesh); mesh.geometry.dispose(); }
+    const geo=new THREE.PlaneGeometry(imgAspect,1,1,1);
+    if(!mat){
+      mat=new THREE.ShaderMaterial({ vertexShader:VERT, fragmentShader:FRAG, uniforms:{
+        uTex:{value:tex}, uMask:{value:maskTex}, uTexel:{value:new THREE.Vector2(1/w,1/h)},
+        uTime:{value:0}, uAspect:{value:imgAspect}, uZoom:{value:1},
+        uFigFlow:{value:P.figFlow}, uFigBreath:{value:P.figBreath}, uFigSpeed:{value:P.figSpeed},
+        uBandSway:{value:P.bandSway}, uBandSpeed:{value:P.bandSpeed},
+        uTouch:{value:P.touch}, uCrisp:{value:P.crisp}, uIntensity:{value:1.0},
+        uMouse:{value:new THREE.Vector2(-10,-10)}, uMouseVel:{value:new THREE.Vector2()}, uMouseAmt:{value:0},
+        uPaper:{value:new THREE.Vector3(PAPER.r,PAPER.g,PAPER.b)}, uInk:{value:new THREE.Vector3(INK.r,INK.g,INK.b)}
+      }});
+    } else { mat.uniforms.uTex.value=tex; mat.uniforms.uMask.value=maskTex; mat.uniforms.uTexel.value.set(1/w,1/h); mat.uniforms.uAspect.value=imgAspect; }
+    mesh=new THREE.Mesh(geo,mat); scene.add(mesh);
+    zoom=zoomT=1; panX=panY=panXT=panYT=0;
+    resizeRenderer(); applyCamera();
+    const ee=document.getElementById('empty'); if(ee) ee.style.display='none';
+    setMeta(`${w}×${h}`+(label?` · ${label}`:'')+' · scroll = zoom');
+  }
+
+  function resizeRenderer(){
+    viewW=window.innerWidth; viewH=window.innerHeight;
+    renderer.setSize(viewW,viewH);
+    const cnvA=viewW/viewH, A=imgAspect;
+    if(cnvA>A){ baseHH=0.5; baseHW=0.5*cnvA; } else { baseHW=A/2; baseHH=(A/2)/cnvA; }
+    baseHW*=1.04; baseHH*=1.04;
+  }
+  function applyCamera(){
+    const A=imgAspect, hw=baseHW/zoom, hh=baseHH/zoom;
+    const maxX=Math.max(0,A/2-hw), maxY=Math.max(0,0.5-hh);
+    panX=Math.min(maxX,Math.max(-maxX,panX)); panY=Math.min(maxY,Math.max(-maxY,panY));
+    camera.left=panX-hw; camera.right=panX+hw; camera.top=panY+hh; camera.bottom=panY-hh;
+    camera.updateProjectionMatrix();
+  }
+
+  /* -------------------- file loading (PSD + raster) -------------------- */
+  const MAX_SIDE=Math.min(4096, renderer.capabilities.maxTextureSize||4096);   // crisp + mobile-GPU safe
+  function capToCanvas(source,sw,sh){
+    let w=sw,h=sh; const sc=Math.min(1,MAX_SIDE/Math.max(w,h));
+    w=Math.max(1,Math.round(w*sc)); h=Math.max(1,Math.round(h*sc));
+    const c=document.createElement('canvas'); c.width=w; c.height=h;
+    const ctx=c.getContext('2d'); ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
+    ctx.drawImage(source,0,0,w,h); return c;
+  }
+  // separable box blur over a Float32 grid
+  function boxBlur(src,w,h,r){
+    const tmp=new Float32Array(w*h), out=new Float32Array(w*h), n=2*r+1;
+    for(let y=0;y<h;y++){ let acc=0; for(let x=-r;x<=r;x++) acc+=src[y*w+Math.min(w-1,Math.max(0,x))];
+      for(let x=0;x<w;x++){ tmp[y*w+x]=acc/n;
+        acc+=src[y*w+Math.min(w-1,Math.max(0,x+r+1))]-src[y*w+Math.min(w-1,Math.max(0,x-r))]; } }
+    for(let x=0;x<w;x++){ let acc=0; for(let y=-r;y<=r;y++) acc+=tmp[Math.min(h-1,Math.max(0,y))*w+x];
+      for(let y=0;y<h;y++){ out[y*w+x]=acc/n;
+        acc+=tmp[Math.min(h-1,Math.max(0,y+r+1))*w+x]-tmp[Math.min(h-1,Math.max(0,y-r))*w+x]; } }
+    return out;
+  }
+  // detect horizontal-line clusters via a structure-tensor orientation map
+  function buildRegionMask(srcCanvas){
+    const W=420, H=Math.max(1,Math.round(W*srcCanvas.height/srcCanvas.width));
+    const sc=document.createElement('canvas'); sc.width=W; sc.height=H;
+    const sx=sc.getContext('2d'); sx.fillStyle='#fff'; sx.fillRect(0,0,W,H); sx.drawImage(srcCanvas,0,0,W,H);
+    const d=sx.getImageData(0,0,W,H).data; const L=new Float32Array(W*H);
+    for(let i=0,p=0;i<W*H;i++,p+=4){ const al=d[p+3]/255; const l=(0.299*d[p]+0.587*d[p+1]+0.114*d[p+2])/255; L[i]=l*al+(1-al); }
+    const Jxx=new Float32Array(W*H), Jyy=new Float32Array(W*H);
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+      const xm=x>0?x-1:0, xp=x<W-1?x+1:W-1, ym=y>0?y-1:0, yp=y<H-1?y+1:H-1;
+      const gx=L[y*W+xp]-L[y*W+xm], gy=L[yp*W+x]-L[ym*W+x];
+      Jxx[y*W+x]=gx*gx; Jyy[y*W+x]=gy*gy;
+    }
+    const bxx=boxBlur(Jxx,W,H,24), byy=boxBlur(Jyy,W,H,24);   // wider -> smooth figure/band transition
+    const out=document.createElement('canvas'); out.width=W; out.height=H;
+    const octx=out.getContext('2d'); const od=octx.createImageData(W,H);
+    // face / chest-belly regions (positional ellipses, tuned to this artwork; from-top coords)
+    const FACE=[0.49,0.14,0.085,0.11], TORSO=[0.49,0.48,0.10,0.22];
+    const bandArr=new Float32Array(W*H);
+    for(let i=0;i<W*H;i++){
+      const e=bxx[i]+byy[i];
+      const horiz=e>1e-6?(byy[i]-bxx[i])/e:0;                   // +1 => horizontal lines
+      const energy=Math.min(1,Math.max(0,(e-0.0015)/(0.02-0.0015)));
+      bandArr[i]=Math.min(1,Math.max(0,horiz)*energy*1.4);
+    }
+    // smooth the band weight so the curved/converging rows don't dip out and tear
+    const bandS=boxBlur(bandArr,W,H,18);
+    for(let i=0;i<W*H;i++){
+      const x=i%W, y=(i/W)|0, uu=x/W, vv=y/H;
+      const band=Math.min(1, bandS[i]*1.15);
+      const fe=((uu-FACE[0])/FACE[2])**2+((vv-FACE[1])/FACE[3])**2;
+      const face=Math.max(0,Math.min(1,(1.0-fe)*1.25));
+      const te=((uu-TORSO[0])/TORSO[2])**2+((vv-TORSO[1])/TORSO[3])**2;
+      const torso=Math.max(0,Math.min(1,(1.0-te)*1.15));
+      const o=i*4;
+      od.data[o]=Math.round(band*255); od.data[o+1]=Math.round(face*255);
+      od.data[o+2]=Math.round(torso*255); od.data[o+3]=255;
+    }
+    octx.putImageData(od,0,0);
+    const t=new THREE.CanvasTexture(out);
+    t.minFilter=THREE.LinearFilter; t.magFilter=THREE.LinearFilter; t.generateMipmaps=false;
+    t.wrapS=t.wrapT=THREE.ClampToEdgeWrapping; t.needsUpdate=true; return t;
+  }
+
+  // remember the last artwork so it auto-loads next time (no more placeholder)
+  function cacheArtwork(srcCanvas){
+    for(const [cap,q] of [[2048,0.9],[1280,0.82]]){
+      try{
+        let w=srcCanvas.width,h=srcCanvas.height; const sc=Math.min(1,cap/Math.max(w,h));
+        w=Math.max(1,Math.round(w*sc)); h=Math.max(1,Math.round(h*sc));
+        const c=document.createElement('canvas'); c.width=w; c.height=h;
+        const ctx=c.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h); ctx.drawImage(srcCanvas,0,0,w,h);
+        localStorage.setItem('lp_art', c.toDataURL('image/jpeg',q)); return true;
+      }catch(e){}
+    }
+    return false;
+  }
+  function showEmpty(){ const ee=document.getElementById('empty'); if(ee) ee.style.display='flex'; }
+  function bootArtwork(){
+    if(window.EMBEDDED_ART){ const im=new Image();
+      im.onload=()=>ingest(capToCanvas(im,im.width,im.height),'embedded');
+      im.onerror=bootCache; im.src=window.EMBEDDED_ART; return; }
+    bootCache();
+  }
+  function bootCache(){
+    let d=null; try{ d=localStorage.getItem('lp_art'); }catch(e){}
+    if(d){ const im=new Image(); im.onload=()=>ingest(capToCanvas(im,im.width,im.height),'remembered');
+      im.onerror=showEmpty; im.src=d; }
+    else showEmpty();
+  }
+  let agPsdPromise=null;
+  function loadAgPsd(){ if(agPsdPromise) return agPsdPromise;
+    agPsdPromise=new Promise((res,rej)=>{ const s=document.createElement('script');
+      s.src='https://cdn.jsdelivr.net/npm/ag-psd@16.0.1/dist/bundle.js';
+      s.onload=()=>res(window.agPsd); s.onerror=()=>rej(new Error('reader load failed')); document.head.appendChild(s); });
+    return agPsdPromise; }
+  function handleFile(file){
+    if(!file) return; const name=(file.name||'').toLowerCase();
+    if(name.endsWith('.psd')||name.endsWith('.psb')){
+      setMeta('reading PSD…');
+      loadAgPsd().then(agPsd=>{ const r=new FileReader();
+        r.onload=()=>{ try{
+          const psd=agPsd.readPsd(r.result,{skipLayerImageData:true,skipThumbnail:true}); const cv=psd.canvas;
+          if(!cv||!cv.width){ setMeta('placeholder'); alert('This PSD has no flattened composite.\nIn Photoshop save with "Maximize Compatibility", or drag a PNG export.'); return; }
+          const cc=capToCanvas(cv,cv.width,cv.height); ingest(cc, file.name); cacheArtwork(cc);
+        }catch(err){ console.error(err); setMeta('placeholder'); alert('Could not parse PSD ('+err.message+').\nExporting a flattened PNG and dragging that in will always work.'); } };
+        r.onerror=()=>{ setMeta('placeholder'); alert('Could not read the file.'); }; r.readAsArrayBuffer(file);
+      }).catch(()=>{ setMeta('placeholder'); alert('Could not load the PSD reader (needs internet). Drag a PNG instead.'); });
+    } else {
+      const im=new Image();
+      im.onload=()=>{ const cc=capToCanvas(im,im.width,im.height); ingest(cc, file.name); cacheArtwork(cc); };
+      im.onerror=()=>alert('Could not load that image.'); im.src=URL.createObjectURL(file);
+    }
+  }
+  const fileInput=document.getElementById('file');
+  document.getElementById('loadBtn').onclick=()=>fileInput.click();
+  fileInput.onchange=e=>handleFile(e.target.files[0]);
+  const hint=document.getElementById('drop-hint');
+  window.addEventListener('dragover',e=>{e.preventDefault();hint.classList.add('show');});
+  window.addEventListener('dragleave',e=>{ if(e.target===document.documentElement||!e.relatedTarget) hint.classList.remove('show');});
+  window.addEventListener('drop',e=>{e.preventDefault();hint.classList.remove('show'); handleFile(e.dataTransfer.files[0]);});
+
+  /* -------------------- placeholder -------------------- */
+  function makePlaceholder(){
+    const c=document.createElement('canvas'); c.width=900; c.height=1160;
+    const x=c.getContext('2d'); x.fillStyle='#ffffff'; x.fillRect(0,0,c.width,c.height);
+    x.strokeStyle='rgba(15,13,12,0.85)'; x.lineWidth=1.1; x.lineCap='round'; const cx=450,cy=560;
+    for(let k=0;k<60;k++){ x.beginPath();
+      for(let a=-1.25;a<=1.25;a+=0.02){ const px=cx+Math.sin(a)*(170+k*0.5); const py=cy+Math.cos(a)*(240+k*0.3)-30;
+        const jx=Math.sin(a*7+k)*3, jy=Math.cos(a*5+k)*3; a===-1.25?x.moveTo(px+jx,py+jy):x.lineTo(px+jx,py+jy);}
+      x.globalAlpha=0.2+0.45*Math.random(); x.stroke(); }
+    x.globalAlpha=1;
+    for(let k=0;k<700;k++){ const a0=-Math.PI*0.95+Math.random()*Math.PI*0.9;
+      let px=cx+Math.cos(a0)*30, py=cy-250+Math.sin(a0)*20; x.beginPath(); x.moveTo(px,py);
+      let dir=a0; const len=180+Math.random()*460;
+      for(let s=0;s<len;s+=5){ dir+=(Math.random()-0.5)*0.16+Math.sin(s*0.02)*0.04+0.02; px+=Math.cos(dir)*5; py+=Math.sin(dir)*5+1.0; x.lineTo(px,py);}
+      x.globalAlpha=0.18+0.5*Math.random(); x.lineWidth=0.6+Math.random()*1.2; x.stroke(); }
+    x.globalAlpha=1; return c;
+  }
+
+  /* -------------------- input -------------------- */
+  function px2uv(cx,cy){
+    const r=renderer.domElement.getBoundingClientRect();
+    const u=(cx-r.left)/r.width, v=(cy-r.top)/r.height;
+    const wx=camera.left+u*(camera.right-camera.left);
+    const wy=camera.top +v*(camera.bottom-camera.top);
+    return new THREE.Vector2(wx/imgAspect+0.5, wy+0.5);
+  }
+  function screenNorm(cx,cy){ const r=renderer.domElement.getBoundingClientRect();
+    return [(cx-r.left)/r.width,(cy-r.top)/r.height]; }
+
+  // ---- unified pointer input (mouse + touch, same on desktop / iPad / phone) ----
+  // EYE = zoom (drag left = smaller, right = bigger); anywhere else = disturbance.
+  const eyeWrap=document.getElementById('eyeWrap');
+  const eyeEl=document.getElementById('eye');
+  const irisEl=document.getElementById('iris');
+  let eyeDrag=false, eyeStartX=0, eyeStartIntensity=1;
+  function isUI(t){ return t && t.closest && t.closest('#panel,#eyeWrap,#toggle,#recStop'); }
+  function setDisturb(cx,cy){ mouse.copy(px2uv(cx,cy)); mouseInside=true; }
+
+  eyeEl.addEventListener('pointerdown', e=>{
+    eyeDrag=true; eyeStartX=e.clientX; eyeStartIntensity=intensityT;
+    eyeWrap.classList.add('dragging');
+    try{ eyeEl.setPointerCapture(e.pointerId); }catch(_){}
+    e.preventDefault();
+  });
+  window.addEventListener('pointerdown', e=>{ if(!isUI(e.target)) setDisturb(e.clientX,e.clientY); });
+  window.addEventListener('pointermove', e=>{
+    if(eyeDrag){
+      const dx=e.clientX-eyeStartX;
+      intensityT=Math.max(0.0, Math.min(16.0, eyeStartIntensity + dx*0.020));  // left=still, right=extreme(~16x)
+      const ir=Math.max(-16,Math.min(16,dx*0.12));
+      if(irisEl) irisEl.setAttribute('transform','translate('+ir.toFixed(1)+',0)');
+      return;
+    }
+    if(!isUI(e.target)) setDisturb(e.clientX,e.clientY);
+  });
+  function endPointer(e){
+    if(eyeDrag){ eyeDrag=false; eyeWrap.classList.remove('dragging');
+      if(irisEl) irisEl.setAttribute('transform','translate(0,0)');
+      intensityT=1.0;   // release -> ease back to the initial state
+    }
+    if(e && e.pointerType==='touch') mouseInside=false;   // finger lifted -> stop disturbance
+  }
+  window.addEventListener('pointerup', endPointer);
+  window.addEventListener('pointercancel', endPointer);
+  window.addEventListener('pointerleave', e=>{ if(e.pointerType!=='touch') mouseInside=false; });
+  // desktop scroll-wheel still zooms (toward centre)
+  window.addEventListener('wheel',e=>{ if(!tex) return; e.preventDefault();
+    zoomT=Math.min(12, Math.max(1, zoomT*(1 - e.deltaY*0.0027))); },{passive:false});
+
+  const sliders=[['figFlow','s_figflow','v_figflow'],['figBreath','s_figbreath','v_figbreath'],['figSpeed','s_figspeed','v_figspeed'],
+    ['bandSway','s_bandsway','v_bandsway'],['bandSpeed','s_bandspeed','v_bandspeed'],
+    ['touch','s_touch','v_touch'],['crisp','s_crisp','v_crisp']];
+  // recalibrated: slider 50 = your saved look, 0 = off, 100 = ~2x (headroom both ways)
+  const BASE={ figFlow:0.10, figBreath:0.33, figSpeed:0.30, bandSway:0.98, bandSpeed:0.82, touch:0.50, crisp:0.46 };
+  sliders.forEach(([key,sid,vid])=>{ const el=document.getElementById(sid), vv=document.getElementById(vid);
+    const apply=()=>{ P[key]=(+el.value/50)*BASE[key]; vv.textContent=el.value; }; el.oninput=apply; apply(); });
+  document.getElementById('toggle').onclick=()=>document.body.classList.remove('collapsed');
+  document.getElementById('hideBtn').onclick=()=>document.body.classList.add('collapsed');
+  document.querySelector('#panel h1').onclick=()=>document.body.classList.toggle('collapsed');
+  window.addEventListener('keydown',e=>{ if((e.key==='h'||e.key==='H')&&!e.metaKey&&!e.ctrlKey) document.body.classList.toggle('collapsed'); });
+  document.body.classList.add('collapsed');   // tech sliders hidden by default — the eye is the main control; ≡ or H reveals
+  if(location.hash.toLowerCase().indexOf('art')>=0) document.body.classList.add('exhibit');  // exhibit mode
+
+  // ---- video recording: hides the panel while recording, then restores it ----
+  let mediaRec=null, recChunks=[], recording=false, recStart=0, recTimer=null;
+  const recBtn=document.getElementById('recBtn');
+  const recStopBtn=document.getElementById('recStop');
+  function startRec(){
+    if(recording) return;
+    if(!renderer.domElement.captureStream || typeof MediaRecorder==='undefined'){
+      alert('此浏览器不支持录制。请用最新版 Chrome / Edge。'); return; }
+    const stream=renderer.domElement.captureStream(60);
+    let mime='video/webm;codecs=vp9';
+    if(!MediaRecorder.isTypeSupported(mime)) mime='video/webm;codecs=vp8';
+    if(!MediaRecorder.isTypeSupported(mime)) mime='video/webm';
+    try{ mediaRec=new MediaRecorder(stream,{mimeType:mime, videoBitsPerSecond:16000000}); }
+    catch(e){ alert('录制启动失败：'+e.message); return; }
+    recChunks=[];
+    mediaRec.ondataavailable=e=>{ if(e.data && e.data.size) recChunks.push(e.data); };
+    mediaRec.onstop=()=>{
+      const blob=new Blob(recChunks,{type:'video/webm'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a'); a.href=url;
+      a.download='living_portrait_'+Date.now()+'.webm'; a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),2000);
+    };
+    mediaRec.start();
+    recording=true; recStart=performance.now();
+    document.body.classList.add('recording');          // hide panel + toggle, show Stop
+    recTimer=setInterval(()=>{ recStopBtn.textContent='■ 停止录制 · '+((performance.now()-recStart)/1000).toFixed(1)+'s'; }, 100);
+  }
+  function stopRec(){
+    if(!recording) return;
+    recording=false; clearInterval(recTimer);
+    document.body.classList.remove('recording');
+    recStopBtn.textContent='■ Stop';
+    if(mediaRec && mediaRec.state!=='inactive') mediaRec.stop();
+  }
+  recBtn.onclick=startRec;
+  recStopBtn.onclick=stopRec;
+  window.addEventListener('resize',()=>{ if(tex){ resizeRenderer(); applyCamera(); }});
+
+  /* -------------------- loop -------------------- */
+  let t0=performance.now(), acc=0;
+  function frame(now){
+    requestAnimationFrame(frame);
+    const dt=Math.min(0.033,(now-t0)/1000); t0=now;
+    if(!mat){ renderer.clear(); return; }
+    // damped zoom/pan -> smooth but snappy glide
+    const k=Math.min(1, dt*24);              // fast, frame-rate independent
+    zoom+=(zoomT-zoom)*k; panX+=(panXT-panX)*k; panY+=(panYT-panY)*k;
+    const ki = eyeDrag ? Math.min(1,dt*18) : Math.min(1,dt*5);   // responsive while dragging, graceful spring-back
+    intensity+=(intensityT-intensity)*ki;
+    acc += dt*(0.35 + intensity*0.65);   // time flows faster as intensity rises (=1 -> normal speed)
+    applyCamera();
+    if(mouseInside) mouseVel.set((mouse.x-mousePrev.x),(mouse.y-mousePrev.y)); else mouseVel.multiplyScalar(0.85);
+    mousePrev.copy(mouse);
+    const u=mat.uniforms;
+    u.uTime.value=acc; u.uZoom.value=zoom;
+    u.uFigFlow.value=P.figFlow; u.uFigBreath.value=P.figBreath; u.uFigSpeed.value=P.figSpeed;
+    u.uBandSway.value=P.bandSway; u.uBandSpeed.value=P.bandSpeed;
+    u.uTouch.value=P.touch; u.uCrisp.value=P.crisp; u.uIntensity.value=intensity;
+    u.uMouse.value.copy(mouse); u.uMouseVel.value.copy(mouseVel); u.uMouseAmt.value=mouseInside?1.0:0.0;
+
+    // background margin-extension lines (off by default; image already has its own)
+    const hw=baseHW/Math.max(zoom,0.0001);
+    const bu=bgMat.uniforms;
+    bu.uTime.value=acc; bu.uSpeed.value=P.bandSpeed; bu.uExtend.value=0.0;
+    bu.uScreenAspect.value=viewW/viewH;
+    bu.uImgHalf.value=imgAspect/(4.0*hw);
+
+    renderer.clear();
+    renderer.render(bgScene,bgCam);
+    renderer.render(scene,camera);
+  }
+  bootArtwork();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
