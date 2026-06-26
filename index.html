@@ -369,8 +369,9 @@
   function resizeRenderer(){
     viewW=window.innerWidth; viewH=window.innerHeight;
     renderer.setSize(viewW,viewH);
-    const cnvA=viewW/viewH;
-    baseHH=0.5; baseHW=0.5*cnvA;   // always fit to height: fills the screen vertically (wide sides crop on phones)
+    const cnvA=viewW/viewH, A=imgAspect;
+    if(cnvA>=A){ baseHW=A/2; baseHH=(A/2)/cnvA; }   // screen wider than art -> fill width, crop top/bottom
+    else { baseHH=0.5; baseHW=0.5*cnvA; }            // screen taller -> fill height, crop sides
   }
   function applyCamera(){
     const A=imgAspect, hw=baseHW/zoom, hh=baseHH/zoom;
@@ -546,7 +547,12 @@
     try{ eyeEl.setPointerCapture(e.pointerId); }catch(_){}
     e.preventDefault();
   });
-  window.addEventListener('pointerdown', e=>{ if(!isUI(e.target)) setDisturb(e.clientX,e.clientY); });
+  let panDown=false, panLastX=0, panLastY=0;
+  window.addEventListener('pointerdown', e=>{
+    if(isUI(e.target)) return;
+    setDisturb(e.clientX,e.clientY);
+    panDown=true; panLastX=e.clientX; panLastY=e.clientY;
+  });
   window.addEventListener('pointermove', e=>{
     if(eyeDrag){
       const dx=e.clientX-eyeStartX;
@@ -555,13 +561,23 @@
       if(irisEl) irisEl.setAttribute('transform','translate('+ir.toFixed(1)+',0)');
       return;
     }
-    if(!isUI(e.target)) setDisturb(e.clientX,e.clientY);
+    if(isUI(e.target) && !panDown) return;
+    setDisturb(e.clientX,e.clientY);
+    if(panDown){                                   // drag to pan when the painting overflows the screen
+      const hw=baseHW/zoom, hh=baseHH/zoom;
+      panXT -= (e.clientX-panLastX)/viewW*2.0*hw;
+      panYT += (e.clientY-panLastY)/viewH*2.0*hh;
+      panLastX=e.clientX; panLastY=e.clientY;
+      const mX=Math.max(0,imgAspect/2-hw), mY=Math.max(0,0.5-hh);
+      panXT=Math.min(mX,Math.max(-mX,panXT)); panYT=Math.min(mY,Math.max(-mY,panYT));
+    }
   });
   function endPointer(e){
     if(eyeDrag){ eyeDrag=false; eyeWrap.classList.remove('dragging');
       if(irisEl) irisEl.setAttribute('transform','translate(0,0)');
       intensityT=1.0;   // release -> ease back to the initial state
     }
+    panDown=false;
     if(e && e.pointerType==='touch') mouseInside=false;   // finger lifted -> stop disturbance
   }
   window.addEventListener('pointerup', endPointer);
