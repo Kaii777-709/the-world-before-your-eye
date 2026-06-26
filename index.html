@@ -63,14 +63,14 @@
   #empty b { color:#6b6052; }
 </style>
 </head>
-<body>
+<body class="exhibit">
 <div id="stage"></div>
 <div id="drop-hint"><span>Drop your artwork (.psd / .png) here</span></div>
 <div id="empty"><div><b>Drag your .psd / .png here</b><br>or click “Load artwork…”.<br>It will be remembered next time.</div></div>
 <button id="toggle" title="Show controls">≡</button>
 <button id="recStop">■ Stop</button>
 <div id="eyeWrap">
-  <svg id="eye" viewBox="0 0 120 70" width="120" height="70">
+  <svg id="eye" viewBox="0 0 120 70" width="84" height="49">
     <path d="M6 35 Q60 3 114 35 Q60 67 6 35 Z" fill="rgba(255,255,255,0.5)" stroke="#1b1714" stroke-width="2.4"/>
     <g id="iris">
       <circle cx="60" cy="35" r="15" fill="rgba(20,17,16,0.16)" stroke="#1b1714" stroke-width="1.8"/>
@@ -369,9 +369,8 @@
   function resizeRenderer(){
     viewW=window.innerWidth; viewH=window.innerHeight;
     renderer.setSize(viewW,viewH);
-    const cnvA=viewW/viewH, A=imgAspect;
-    if(cnvA>A){ baseHH=0.5; baseHW=0.5*cnvA; } else { baseHW=A/2; baseHH=(A/2)/cnvA; }
-    baseHW*=1.04; baseHH*=1.04;
+    const cnvA=viewW/viewH;
+    baseHH=0.5; baseHW=0.5*cnvA;   // always fit to height: fills the screen vertically (wide sides crop on phones)
   }
   function applyCamera(){
     const A=imgAspect, hw=baseHW/zoom, hh=baseHH/zoom;
